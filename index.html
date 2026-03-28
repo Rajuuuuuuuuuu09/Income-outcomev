@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Budget — รายรับรายจ่าย</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:     #0c0e14;
+  --s1:     #13161f;
+  --s2:     #1c2030;
+  --s3:     #252a40;
+  --bd:     rgba(255,255,255,0.07);
+  --bd2:    rgba(255,255,255,0.13);
+  --g:      #4ade80;
+  --r:      #f87171;
+  --b:      #60a5fa;
+  --text:   #e2e8f0;
+  --muted:  #64748b;
+  --muted2: #94a3b8;
+  --rad:    14px;
+  --font:   'Noto Sans Thai', sans-serif;
+  --mono:   'IBM Plex Mono', monospace;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--font); min-height: 100dvh;
+  font-size: 15px; -webkit-tap-highlight-color: transparent;
+}
+.app { max-width: 680px; margin: 0 auto; padding: 24px 16px 80px; }
+
+.hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+.hdr-title { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.02em; }
+.hdr-sub { font-size: 0.75rem; color: var(--muted); margin-top: 2px; font-family: var(--mono); }
+
+.period-bar {
+  display: flex; background: var(--s1); border: 1px solid var(--bd);
+  border-radius: 10px; padding: 4px; margin-bottom: 20px; gap: 2px;
+}
+.period-btn {
+  flex: 1; padding: 8px 0; border: none; background: transparent;
+  color: var(--muted); font-family: var(--font); font-size: 0.82rem;
+  font-weight: 500; border-radius: 7px; cursor: pointer; transition: all .18s;
+}
+.period-btn.active { background: var(--s3); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+
+.date-range { display: none; gap: 10px; margin-bottom: 16px; align-items: center; }
+.date-range.show { display: flex; }
+.date-range input[type="date"] {
+  flex: 1; background: var(--s1); border: 1px solid var(--bd); border-radius: 8px;
+  padding: 8px 10px; color: var(--text); font-family: var(--font); font-size: 0.82rem; outline: none;
+}
+.date-range input[type="date"]:focus { border-color: var(--b); }
+.date-range span { color: var(--muted); font-size: 0.8rem; flex-shrink: 0; }
+
+.cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 20px; }
+.card {
+  background: var(--s1); border: 1px solid var(--bd);
+  border-radius: var(--rad); padding: 16px 14px;
+  position: relative; overflow: hidden;
+}
+.card::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; }
+.card.c-in::after  { background: var(--g); }
+.card.c-out::after { background: var(--r); }
+.card.c-bal::after { background: var(--b); }
+.card-lbl { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+.card-val { font-family: var(--mono); font-size: 1.05rem; font-weight: 500; }
+.card.c-in  .card-val { color: var(--g); }
+.card.c-out .card-val { color: var(--r); }
+
+.chart-wrap {
+  background: var(--s1); border: 1px solid var(--bd);
+  border-radius: var(--rad); padding: 20px 16px 14px;
+  margin-bottom: 20px; position: relative;
+}
+.chart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.chart-title { font-size: 0.8rem; color: var(--muted2); font-weight: 500; }
+.chart-legend { display: flex; gap: 12px; font-size: 0.7rem; color: var(--muted); }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+.chart-canvas-wrap { position: relative; }
+canvas#chart { width: 100% !important; height: 180px; display: block; cursor: crosshair; }
+
+#chart-tip {
+  position: absolute; background: var(--s3); border: 1px solid var(--bd2);
+  border-radius: 8px; padding: 10px 12px; font-size: 0.75rem;
+  pointer-events: none; opacity: 0; transition: opacity .15s;
+  z-index: 10; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,.5); min-width: 130px;
+}
+#chart-tip.show { opacity: 1; }
+#chart-tip .tt-lbl  { color: var(--muted2); margin-bottom: 6px; font-weight: 500; }
+#chart-tip .tt-in   { color: var(--g); margin-bottom: 3px; }
+#chart-tip .tt-out  { color: var(--r); margin-bottom: 3px; }
+#chart-tip .tt-bal  { color: var(--b); font-weight: 600; border-top: 1px solid var(--bd); padding-top: 4px; margin-top: 4px; }
+
+.form-card {
+  background: var(--s1); border: 1px solid var(--bd);
+  border-radius: var(--rad); padding: 18px; margin-bottom: 20px;
+}
+.form-title { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 14px; }
+.type-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.type-btn {
+  padding: 10px; border-radius: 9px; border: 1px solid var(--bd); background: var(--s2);
+  color: var(--muted); font-family: var(--font); font-size: 0.88rem; font-weight: 500;
+  cursor: pointer; transition: all .18s; display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.type-btn.sel-in  { background: rgba(74,222,128,.12); border-color: rgba(74,222,128,.4); color: var(--g); }
+.type-btn.sel-out { background: rgba(248,113,113,.12); border-color: rgba(248,113,113,.4); color: var(--r); }
+
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field.full { grid-column: 1 / -1; }
+.field label { font-size: 0.72rem; color: var(--muted); }
+.field input, .field select {
+  background: var(--s2); border: 1px solid var(--bd); border-radius: 8px;
+  padding: 9px 11px; color: var(--text); font-family: var(--font);
+  font-size: 0.9rem; outline: none; transition: border-color .15s;
+  -webkit-appearance: none; appearance: none; width: 100%;
+}
+.field input:focus, .field select:focus { border-color: var(--b); }
+.field input::placeholder { color: var(--muted); }
+.field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px;
+}
+.save-btn {
+  margin-top: 12px; width: 100%; padding: 12px; background: var(--b); color: #0c0e14;
+  border: none; border-radius: 9px; font-family: var(--font); font-size: 0.92rem;
+  font-weight: 600; cursor: pointer; transition: all .18s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.save-btn:active { transform: scale(.98); opacity: .9; }
+
+.list-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.list-title { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.list-count { font-size: 0.72rem; color: var(--muted); font-family: var(--mono); }
+
+.search-box {
+  display: flex; align-items: center; background: var(--s1); border: 1px solid var(--bd);
+  border-radius: 9px; padding: 0 12px; gap: 8px; margin-bottom: 12px;
+}
+.search-box input {
+  flex: 1; background: transparent; border: none; padding: 10px 0;
+  color: var(--text); font-family: var(--font); font-size: 0.88rem; outline: none;
+}
+.search-box input::placeholder { color: var(--muted); }
+
+.tx-list { display: flex; flex-direction: column; gap: 7px; }
+.date-sep { font-size: .72rem; color: var(--muted); padding: 8px 2px 4px; font-family: var(--mono); }
+.tx-item {
+  background: var(--s1); border: 1px solid var(--bd); border-radius: var(--rad);
+  padding: 13px 14px; display: flex; align-items: center; gap: 12px;
+  animation: fadeUp .2s ease both;
+}
+@keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+.tx-icon {
+  width: 36px; height: 36px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0;
+}
+.tx-icon.in  { background: rgba(74,222,128,.1); }
+.tx-icon.out { background: rgba(248,113,113,.1); }
+.tx-body { flex: 1; min-width: 0; }
+.tx-desc { font-size: 0.9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+.tx-cat { background: var(--s3); border-radius: 4px; padding: 1px 6px; font-size: 0.65rem; color: var(--muted2); }
+.tx-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.tx-amount { font-family: var(--mono); font-size: 0.92rem; font-weight: 500; white-space: nowrap; }
+.tx-amount.in  { color: var(--g); }
+.tx-amount.out { color: var(--r); }
+.tx-del {
+  background: none; border: none; color: var(--bd2);
+  cursor: pointer; padding: 2px 4px; border-radius: 4px;
+  font-size: 0.8rem; transition: color .15s; line-height: 1;
+}
+.tx-del:hover { color: var(--r); }
+
+.empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+.empty-icon { font-size: 2.5rem; margin-bottom: 10px; opacity: .5; }
+.empty p { font-size: 0.85rem; }
+
+#toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--s3); border: 1px solid var(--bd2); border-radius: 8px;
+  padding: 10px 18px; font-size: 0.82rem; color: var(--text);
+  opacity: 0; transition: all .25s; z-index: 100; white-space: nowrap; pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 400px) {
+  .cards { grid-template-columns: 1fr 1fr; }
+  .cards .card:last-child { grid-column: 1 / -1; }
+  .fields { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="hdr">
+    <div>
+      <div class="hdr-title">💸 รายรับรายจ่าย</div>
+      <div class="hdr-sub" id="period-label">—</div>
+    </div>
+  </div>
+
+  <div class="period-bar">
+    <button class="period-btn"        onclick="setPeriod('day',this)">วันนี้</button>
+    <button class="period-btn"        onclick="setPeriod('week',this)">สัปดาห์</button>
+    <button class="period-btn active" onclick="setPeriod('month',this)">เดือน</button>
+    <button class="period-btn"        onclick="setPeriod('year',this)">ปี</button>
+    <button class="period-btn"        onclick="setPeriod('custom',this)">กำหนด</button>
+  </div>
+
+  <div class="date-range" id="date-range">
+    <input type="date" id="date-from" onchange="render()">
+    <span>—</span>
+    <input type="date" id="date-to" onchange="render()">
+  </div>
+
+  <div class="cards">
+    <div class="card c-in"><div class="card-lbl">รายรับ</div><div class="card-val" id="sum-in">฿0</div></div>
+    <div class="card c-out"><div class="card-lbl">รายจ่าย</div><div class="card-val" id="sum-out">฿0</div></div>
+    <div class="card c-bal"><div class="card-lbl">คงเหลือ</div><div class="card-val" id="sum-bal">฿0</div></div>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-head">
+      <span class="chart-title">ภาพรวม</span>
+      <div class="chart-legend">
+        <span><span class="dot" style="background:var(--g)"></span>รายรับ</span>
+        <span><span class="dot" style="background:var(--r)"></span>รายจ่าย</span>
+      </div>
+    </div>
+    <div class="chart-canvas-wrap">
+      <canvas id="chart"></canvas>
+      <div id="chart-tip">
+        <div class="tt-lbl" id="tt-lbl">—</div>
+        <div class="tt-in"  id="tt-in">รายรับ: —</div>
+        <div class="tt-out" id="tt-out">รายจ่าย: —</div>
+        <div class="tt-bal" id="tt-bal">คงเหลือ: —</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <div class="form-title">เพิ่มรายการ</div>
+    <div class="type-row">
+      <button class="type-btn sel-in" id="btn-in" onclick="setType('income')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg>รายรับ
+      </button>
+      <button class="type-btn" id="btn-out" onclick="setType('expense')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>รายจ่าย
+      </button>
+    </div>
+    <div class="fields">
+      <div class="field full">
+        <label>รายละเอียด</label>
+        <input type="text" id="f-desc" placeholder="เช่น ค่าอาหารเที่ยง">
+      </div>
+      <div class="field">
+        <label>จำนวนเงิน (฿)</label>
+        <input type="number" id="f-amount" placeholder="0.00" min="0" step="0.01" inputmode="decimal">
+      </div>
+      <div class="field">
+        <label>หมวดหมู่</label>
+        <select id="f-cat"></select>
+      </div>
+      <div class="field full">
+        <label>วันที่</label>
+        <input type="date" id="f-date">
+      </div>
+    </div>
+    <button class="save-btn" onclick="addTx()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      บันทึกรายการ
+    </button>
+  </div>
+
+  <div class="list-head">
+    <span class="list-title">รายการ</span>
+    <span class="list-count" id="list-count">0 รายการ</span>
+  </div>
+  <div class="search-box">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" id="search" placeholder="ค้นหารายการ…" oninput="render()">
+  </div>
+  <div class="tx-list" id="tx-list"></div>
+
+</div>
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  STATE — ประกาศทุกอย่างที่นี่ ที่เดียว ไม่มี duplicate
+// ═══════════════════════════════════════════════════════
+var txns      = JSON.parse(localStorage.getItem('budget_txns') || '[]');
+var curType   = 'income';
+var curPeriod = 'month';
+var chartData = [];
+
+var CATS = {
+  income:  ['💼 เงินเดือน','💻 ฟรีแลนซ์','🛒 ขายของ','🏦 ดอกเบี้ย','🎁 รับของขวัญ','📦 อื่นๆ'],
+  expense: ['🍜 อาหาร','🚗 เดินทาง','🛍️ ช้อปปิ้ง','💊 สุขภาพ','🎉 บันเทิง','📱 โทรศัพท์','🏠 ที่พัก','💡 สาธารณูปโภค','📦 อื่นๆ']
+};
+
+// ═══════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function fmt(n) {
+  var abs = Math.abs(n);
+  if (abs >= 1000000) return '฿' + (n / 1000000).toFixed(1) + 'M';
+  if (abs >= 100000)  return '฿' + (n / 1000).toFixed(0) + 'k';
+  return '฿' + n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function fmtFull(n) {
+  return (n < 0 ? '−฿' : '฿') + Math.abs(n).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function showToast(msg) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._tid);
+  el._tid = setTimeout(function() { el.classList.remove('show'); }, 2200);
+}
+
+function save() {
+  localStorage.setItem('budget_txns', JSON.stringify(txns));
+}
+
+// ═══════════════════════════════════════════════════════
+//  TYPE TOGGLE
+// ═══════════════════════════════════════════════════════
+function setType(t) {
+  curType = t;
+  document.getElementById('btn-in').className  = 'type-btn' + (t === 'income'  ? ' sel-in'  : '');
+  document.getElementById('btn-out').className = 'type-btn' + (t === 'expense' ? ' sel-out' : '');
+  updateCats();
+}
+
+function updateCats() {
+  var sel  = document.getElementById('f-cat');
+  var list = CATS[curType];
+  var html = '';
+  for (var i = 0; i < list.length; i++) html += '<option>' + list[i] + '</option>';
+  sel.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════
+//  PERIOD FILTER
+// ═══════════════════════════════════════════════════════
+function setPeriod(p, btn) {
+  curPeriod = p;
+  var btns = document.querySelectorAll('.period-btn');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+  btn.classList.add('active');
+
+  var dr = document.getElementById('date-range');
+  if (p === 'custom') {
+    dr.classList.add('show');
+    var t = todayStr();
+    if (!document.getElementById('date-from').value) document.getElementById('date-from').value = t.slice(0, 8) + '01';
+    if (!document.getElementById('date-to').value)   document.getElementById('date-to').value   = t;
+  } else {
+    dr.classList.remove('show');
+  }
+  render();
+}
+
+function getPeriodRange() {
+  var now = new Date();
+  var y   = now.getFullYear();
+  var m   = now.getMonth();
+  var from, to;
+
+  if (curPeriod === 'day') {
+    from = todayStr();
+    to   = todayStr();
+
+  } else if (curPeriod === 'week') {
+    var dow  = now.getDay();
+    var diff = (dow === 0) ? -6 : 1 - dow;
+    var mon  = new Date(now); mon.setDate(now.getDate() + diff);
+    var sun  = new Date(mon); sun.setDate(mon.getDate() + 6);
+    from = mon.toISOString().slice(0, 10);
+    to   = sun.toISOString().slice(0, 10);
+
+  } else if (curPeriod === 'month') {
+    from = y + '-' + String(m + 1).padStart(2, '0') + '-01';
+    var lastDay = new Date(y, m + 1, 0);
+    to = lastDay.toISOString().slice(0, 10);
+
+  } else if (curPeriod === 'year') {
+    from = y + '-01-01';
+    to   = y + '-12-31';
+
+  } else {
+    from = document.getElementById('date-from').value || todayStr();
+    to   = document.getElementById('date-to').value   || todayStr();
+  }
+
+  return { from: from, to: to };
+}
+
+function inRange(date, from, to) {
+  return date >= from && date <= to;
+}
+
+function periodLabel() {
+  var r    = getPeriodRange();
+  var opts = { day: 'numeric', month: 'short', year: 'numeric' };
+  var f    = function(d) { return new Date(d + 'T00:00:00').toLocaleDateString('th-TH', opts); };
+  return r.from === r.to ? f(r.from) : f(r.from) + ' — ' + f(r.to);
+}
+
+// ═══════════════════════════════════════════════════════
+//  ADD / DELETE
+// ═══════════════════════════════════════════════════════
+function addTx() {
+  var desc   = document.getElementById('f-desc').value.trim();
+  var amount = parseFloat(document.getElementById('f-amount').value);
+  var cat    = document.getElementById('f-cat').value;
+  var date   = document.getElementById('f-date').value;
+
+  if (!desc)             { showToast('⚠️ กรุณากรอกรายละเอียด'); return; }
+  if (!amount || amount <= 0) { showToast('⚠️ กรุณากรอกจำนวนเงินที่ถูกต้อง'); return; }
+  if (!date)             { showToast('⚠️ กรุณาเลือกวันที่'); return; }
+
+  txns.unshift({ id: Date.now(), type: curType, desc: desc, amount: amount, cat: cat, date: date });
+  save();
+  render();
+  document.getElementById('f-desc').value   = '';
+  document.getElementById('f-amount').value = '';
+  showToast(curType === 'income' ? '✅ บันทึกรายรับแล้ว' : '✅ บันทึกรายจ่ายแล้ว');
+}
+
+function delTx(id) {
+  if (!confirm('ลบรายการนี้?')) return;
+  txns = txns.filter(function(t) { return t.id !== id; });
+  save();
+  render();
+  showToast('🗑️ ลบรายการแล้ว');
+}
+
+// ═══════════════════════════════════════════════════════
+//  BUILD CHART DATA
+// ═══════════════════════════════════════════════════════
+function buildChartData() {
+  var now  = new Date();
+  var y    = now.getFullYear();
+  var m    = now.getMonth();
+  var bins = [];
+
+  if (curPeriod === 'day') {
+    var t = todayStr();
+    for (var h = 0; h < 24; h++) {
+      (function(hour) {
+        var inc = txns.filter(function(tx) { return tx.type === 'income'  && tx.date === t && new Date(tx.id).getHours() === hour; }).reduce(function(s, tx) { return s + tx.amount; }, 0);
+        var exp = txns.filter(function(tx) { return tx.type === 'expense' && tx.date === t && new Date(tx.id).getHours() === hour; }).reduce(function(s, tx) { return s + tx.amount; }, 0);
+        bins.push({ label: hour + ':00', inc: inc, exp: exp });
+      })(h);
+    }
+
+  } else if (curPeriod === 'week') {
+    var r1  = getPeriodRange();
+    var day = ['จ.','อ.','พ.','พฤ.','ศ.','ส.','อา.'];
+    for (var i = 0; i < 7; i++) {
+      (function(idx) {
+        var d  = new Date(r1.from + 'T00:00:00'); d.setDate(d.getDate() + idx);
+        var ds = d.toISOString().slice(0, 10);
+        var inc = txns.filter(function(tx) { return tx.type === 'income'  && tx.date === ds; }).reduce(function(s, tx) { return s + tx.amount; }, 0);
+        var exp = txns.filter(function(tx) { return tx.type === 'expense' && tx.date === ds; }).reduce(function(s, tx) { return s + tx.amount; }, 0);
+        bins.push({ label: day[idx], inc: inc, exp: exp });
+      })(i);
+    }
+
+  } else if (curPeriod === 'month') {
+    var daysInMonth = new Date(y, m + 1, 0).getDate();
+    var mp = y + '-' + String(m + 1).padStart(2, '0') + '-';
+    for (var d2 = 1; d2 <= daysInMonth; d2++) {
+      (function(day2) {
+        var ds = mp + String(day2).padStart(2, '0');
+        var inc = txns.filter(function(tx) { return tx.type === 'income'  && tx.date === ds; }).reduce(function(s, tx) { return s + tx.amount; }, 0);
+        var exp = txns.filter(function(tx) { return tx.type === 'expense' && tx.date === ds; }).reduce(function(s, tx) { return s + tx.amount; }, 0);
+        bins.push({ label: String(day2), inc: inc, exp: exp });
+      })(d2);
+    }
+
+  } else if (curPeriod === 'year') {
+    var mNames = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    for (var mo = 0; mo < 12; mo++) {
+      (function(month) {
+        var prefix = y + '-' + String(month + 1).padStart(2, '0');
+        var inc = txns.filter(function(tx) { return tx.type === 'income'  && tx.date.slice(0, 7) === prefix; }).reduce(function(s, tx) { return s + tx.amount; }, 0);
+        var exp = txns.filter(function(tx) { return tx.type === 'expense' && tx.date.slice(0, 7) === prefix; }).reduce(function(s, tx) { return s + tx.amount; }, 0);
+        bins.push({ label: mNames[month], inc: inc, exp: exp });
+      })(mo);
+    }
+
+  } else {
+    var r2  = getPeriodRange();
+    var cur = new Date(r2.from + 'T00:00:00');
+    var end = new Date(r2.to   + 'T00:00:00');
+    while (cur <= end) {
+      var cs  = cur.toISOString().slice(0, 10);
+      var inc = txns.filter(function(tx) { return tx.type === 'income'  && tx.date === cs; }).reduce(function(s, tx) { return s + tx.amount; }, 0);
+      var exp = txns.filter(function(tx) { return tx.type === 'expense' && tx.date === cs; }).reduce(function(s, tx) { return s + tx.amount; }, 0);
+      bins.push({ label: cs.slice(5).replace('-', '/'), inc: inc, exp: exp });
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+
+  return bins;
+}
+
+// ═══════════════════════════════════════════════════════
+//  DRAW CHART (canvas)
+// ═══════════════════════════════════════════════════════
+function drawRoundRect(ctx, x, y, w, h, r) {
+  if (h < 1) { ctx.rect(x, y + h - 1, w, 1); return; }
+  if (h < r * 2) r = h / 2;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawChart() {
+  var canvas = document.getElementById('chart');
+  var dpr = window.devicePixelRatio || 1;
+  var W   = canvas.parentElement.offsetWidth;
+  var H   = 180;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  if (!chartData.length) return;
+
+  var PAD  = { top: 12, right: 8, bottom: 24, left: 8 };
+  var iW   = W - PAD.left - PAD.right;
+  var iH   = H - PAD.top  - PAD.bottom;
+  var n    = chartData.length;
+  var maxV = 1;
+  for (var i = 0; i < n; i++) {
+    if (chartData[i].inc > maxV) maxV = chartData[i].inc;
+    if (chartData[i].exp > maxV) maxV = chartData[i].exp;
+  }
+
+  var groupW = iW / n;
+  var barW   = Math.min(Math.max(3, groupW * 0.28), 18);
+  var gap    = Math.min(3, barW * 0.4);
+  var step   = n <= 12 ? 1 : n <= 31 ? 5 : Math.ceil(n / 8);
+
+  // Grid lines
+  for (var gi = 0; gi <= 3; gi++) {
+    var gy = PAD.top + (iH / 3) * (3 - gi);
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    ctx.moveTo(PAD.left, gy);
+    ctx.lineTo(W - PAD.right, gy);
+    ctx.stroke();
+  }
+
+  // Bars + labels
+  for (var bi = 0; bi < n; bi++) {
+    var b   = chartData[bi];
+    var cx  = PAD.left + groupW * bi + groupW / 2;
+    var incH = (b.inc / maxV) * iH;
+    var expH = (b.exp / maxV) * iH;
+
+    ctx.globalAlpha = 0.75;
+
+    ctx.fillStyle = '#4ade80';
+    drawRoundRect(ctx, cx - gap / 2 - barW, PAD.top + iH - incH, barW, incH, 3);
+    ctx.fill();
+
+    ctx.fillStyle = '#f87171';
+    drawRoundRect(ctx, cx + gap / 2, PAD.top + iH - expH, barW, expH, 3);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+
+    if (bi % step === 0 || bi === n - 1) {
+      ctx.fillStyle  = '#64748b';
+      ctx.font       = Math.min(10, Math.max(8, iW / n * 0.55)) + 'px "IBM Plex Mono"';
+      ctx.textAlign  = 'center';
+      ctx.fillText(b.label, cx, H - 5);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  CHART TOOLTIP
+// ═══════════════════════════════════════════════════════
+function setupChartInteraction() {
+  var canvas = document.getElementById('chart');
+  var tip    = document.getElementById('chart-tip');
+
+  function showTip(px, py) {
+    var W   = canvas.offsetWidth;
+    var H   = canvas.offsetHeight;
+    var PAD = { top: 12, right: 8, bottom: 24, left: 8 };
+    var iW  = W - PAD.left - PAD.right;
+    var n   = chartData.length;
+    if (!n) { tip.classList.remove('show'); return; }
+
+    var idx = Math.floor((px - PAD.left) / (iW / n));
+    if (idx < 0 || idx >= n) { tip.classList.remove('show'); return; }
+
+    var b = chartData[idx];
+    document.getElementById('tt-lbl').textContent  = b.label;
+    document.getElementById('tt-in').textContent   = 'รายรับ: '  + fmtFull(b.inc);
+    document.getElementById('tt-out').textContent  = 'รายจ่าย: ' + fmtFull(b.exp);
+    document.getElementById('tt-bal').textContent  = 'คงเหลือ: ' + fmtFull(b.inc - b.exp);
+    tip.classList.add('show');
+
+    var tw = tip.offsetWidth, th = tip.offsetHeight;
+    var tx = px + 12, ty = py - 20;
+    if (tx + tw > W - 8) tx = px - tw - 12;
+    if (ty + th > H - 8) ty = py - th;
+    if (ty < 0) ty = 4;
+    tip.style.left = tx + 'px';
+    tip.style.top  = ty + 'px';
+  }
+
+  canvas.addEventListener('mousemove', function(e) {
+    var r = canvas.getBoundingClientRect();
+    showTip(e.clientX - r.left, e.clientY - r.top);
+  });
+  canvas.addEventListener('mouseleave', function() {
+    tip.classList.remove('show');
+  });
+  canvas.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    var r = canvas.getBoundingClientRect();
+    var touch = e.touches[0];
+    showTip(touch.clientX - r.left, touch.clientY - r.top);
+  }, { passive: false });
+  canvas.addEventListener('touchend', function() {
+    setTimeout(function() { tip.classList.remove('show'); }, 1600);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  MAIN RENDER
+// ═══════════════════════════════════════════════════════
+function render() {
+  var range  = getPeriodRange();
+  var search = document.getElementById('search').value.toLowerCase();
+
+  document.getElementById('period-label').textContent = periodLabel();
+
+  var filtered = txns.filter(function(t) {
+    if (!inRange(t.date, range.from, range.to)) return false;
+    if (search && t.desc.toLowerCase().indexOf(search) === -1 && t.cat.toLowerCase().indexOf(search) === -1) return false;
+    return true;
+  });
+
+  var sumIn  = filtered.filter(function(t) { return t.type === 'income'; }).reduce(function(s, t) { return s + t.amount; }, 0);
+  var sumOut = filtered.filter(function(t) { return t.type === 'expense'; }).reduce(function(s, t) { return s + t.amount; }, 0);
+  var bal    = sumIn - sumOut;
+
+  document.getElementById('sum-in').textContent  = fmt(sumIn);
+  document.getElementById('sum-out').textContent = fmt(sumOut);
+  var bEl = document.getElementById('sum-bal');
+  bEl.textContent = (bal < 0 ? '−' : '') + fmt(Math.abs(bal));
+  bEl.style.color = bal >= 0 ? 'var(--g)' : 'var(--r)';
+
+  chartData = buildChartData();
+  drawChart();
+
+  document.getElementById('list-count').textContent = filtered.length + ' รายการ';
+  var list = document.getElementById('tx-list');
+
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>ไม่พบรายการในช่วงเวลานี้</p></div>';
+    return;
+  }
+
+  var groups = {};
+  for (var i = 0; i < filtered.length; i++) {
+    var t = filtered[i];
+    if (!groups[t.date]) groups[t.date] = [];
+    groups[t.date].push(t);
+  }
+
+  var dates = Object.keys(groups).sort(function(a, b) { return a < b ? 1 : a > b ? -1 : 0; });
+  var html  = '';
+
+  for (var di = 0; di < dates.length; di++) {
+    var date  = dates[di];
+    var label = new Date(date + 'T00:00:00').toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    html += '<div class="date-sep">' + label + '</div>';
+
+    var items = groups[date];
+    for (var ii = 0; ii < items.length; ii++) {
+      var tx      = items[ii];
+      var emoji   = tx.cat.split(' ')[0];
+      var catName = tx.cat.replace(/^\S+\s/, '');
+      var cls     = tx.type === 'income' ? 'in' : 'out';
+      var sign    = tx.type === 'income' ? '+' : '−';
+      html += '<div class="tx-item">' +
+        '<div class="tx-icon ' + cls + '">' + emoji + '</div>' +
+        '<div class="tx-body">' +
+          '<div class="tx-desc">' + tx.desc + '</div>' +
+          '<div><span class="tx-cat">' + catName + '</span></div>' +
+        '</div>' +
+        '<div class="tx-right">' +
+          '<div class="tx-amount ' + cls + '">' + sign + fmt(tx.amount) + '</div>' +
+          '<button class="tx-del" onclick="delTx(' + tx.id + ')">✕</button>' +
+        '</div>' +
+      '</div>';
+    }
+  }
+  list.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════
+//  EVENTS
+// ═══════════════════════════════════════════════════════
+window.addEventListener('resize', function() { drawChart(); });
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && document.activeElement.id !== 'search') addTx();
+});
+
+// ═══════════════════════════════════════════════════════
+//  INIT — อยู่ล่างสุดเสมอ หลัง define ทุก function แล้ว
+// ═══════════════════════════════════════════════════════
+document.getElementById('f-date').value = todayStr();
+updateCats();
+setType('income');
+setupChartInteraction();
+render();
+</script>
+</body>
+</html>
