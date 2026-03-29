@@ -304,9 +304,15 @@ var curPeriod = 'month';
 var chartData = [];
 
 var CATS = {
-  income:  ['💼 เงินรายเดือน','💻 ลงทุน','🛒 ขายของ','🏦 ดอกเบี้ย','🎁 รับของขวัญ','📦 อื่นๆ'],
-  expense: ['🍜 อาหาร','🚗 น้ำมัน','🛍️ ช้อปปิ้ง','💊 สุขภาพ','🎉 บันเทิง','📱 ลงทุน','🏠 ค่าหอ','💡 อุปกรณ์','📦 อื่นๆ']
+  income:  ['💼 เงินเดือน','💻 ฟรีแลนซ์','🛒 ขายของ','🏦 ดอกเบี้ย','🎁 รับของขวัญ','📦 อื่นๆ'],
+  expense: ['🍜 อาหาร','🚗 เดินทาง','🛍️ ช้อปปิ้ง','💊 สุขภาพ','🎉 บันเทิง','📱 โทรศัพท์','🏠 ที่พัก','💡 สาธารณูปโภค','📦 อื่นๆ']
 };
+
+// JSONBIN CONFIG
+var BIN_ID  = '69c923315fdde574550eec9f';
+var BIN_KEY = '$2a$10$2HRMq.bv761i2hn9p9Btfeo/kLxjSJbUeadf3Xjh3CtjoU8Hdc78y';
+var BIN_URL = 'https://api.jsonbin.io/v3/b/' + BIN_ID;
+var _saving = false;
 
 // ═══════════════════════════════════════════════════════
 //  HELPERS
@@ -336,6 +342,28 @@ function showToast(msg) {
 
 function save() {
   localStorage.setItem('budget_txns', JSON.stringify(txns));
+  if (_saving) return;
+  _saving = true;
+  fetch(BIN_URL, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Master-Key': BIN_KEY },
+    body: JSON.stringify({ txns: txns })
+  })
+  .then(function() { _saving = false; })
+  .catch(function() { _saving = false; showToast('⚠️ ไม่มีอินเทอร์เน็ต บันทึกเฉพาะในเครื่อง'); });
+}
+
+function loadFromCloud(cb) {
+  fetch(BIN_URL + '/latest', { headers: { 'X-Master-Key': BIN_KEY } })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    if (data && data.record && Array.isArray(data.record.txns)) {
+      txns = data.record.txns;
+      localStorage.setItem('budget_txns', JSON.stringify(txns));
+    }
+    cb();
+  })
+  .catch(function() { cb(); });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -751,7 +779,8 @@ document.getElementById('f-date').value = todayStr();
 updateCats();
 setType('income');
 setupChartInteraction();
-render();
+// โหลดข้อมูลจาก cloud ก่อน แล้วค่อย render
+loadFromCloud(function() { render(); });
 </script>
 </body>
 </html>
